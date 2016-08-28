@@ -1,9 +1,10 @@
+from django.test import LiveServerTestCase
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import unittest
 
 
-class NewVisitorTest(unittest.TestCase):
+class NewVisitorTest(LiveServerTestCase):
 
     def setUp(self):
         self.browser = webdriver.Firefox()
@@ -20,7 +21,7 @@ class NewVisitorTest(unittest.TestCase):
     def test_can_start_a_list_and_retrieve_it_later(self):
         # Jono is visiting our website for the first time.
         # He checks out the homepage first.
-        self.browser.get('http://localhost:8000')
+        self.browser.get(self.live_server_url)
 
         # He sees that the page title and header talk about to-do lists
         self.assertIn('To-Do', self.browser.title)
@@ -40,6 +41,8 @@ class NewVisitorTest(unittest.TestCase):
         # When he hits enter, the page updates, and now the page lists
         # "1: Buy peacock feathers" as an item in a to-do list table
         inputbox.send_keys(Keys.ENTER)
+        jono_list_url = self.browser.current_url
+        self.assertRegex(jono_list_url, '/lists/.+')
         self.check_for_row_in_list_table('1: Buy peacock feathers')
 
         # There is still a text box inviting him to add another item.
@@ -52,11 +55,40 @@ class NewVisitorTest(unittest.TestCase):
         self.check_for_row_in_list_table('1: Buy peacock feathers')
         self.check_for_row_in_list_table('2: Use peacock feathers to make a fly')
 
-        # Jono wonders whether the site will remember his list.
+        # Now a new user, Francis comes along to the site.
+
+        ## We use a new browser session to make sure that no information
+        ## of Jono's is coming through from cookies etc
+        self.browser.quit()
+        self.browser = webdriver.Firefox()
+
+        # Andy visits the home page. There is no sign of Jono's
+        # list
+        self.browser.get(self.live_server_url)
+        page_text = self.browser.find_element_by_tag_name('body').text
+        self.assertNotIn('Buy peacock feathers', page_text)
+        self.assertNotIn('make a fly', page_text)
+
+        # Andy starts a new list by entering a new item. He
+        # is less interesting than Jono. . .
+        inputbox = self.browser.find_element_by_id('id_new_item')
+        inputbox.send_keys('Buy milk')
+        inputbox.send_keys(Keys.ENTER)
+
+        # Andy gets his own unique URL
+        andy_list_url = self.browser.current_url
+        self.assertRegex(andy_list_url, '/lists/.+')
+        self.assertNotEqual(andy_list_url, jono_list_url)
+
+        # Again, there is no trace of Jono's list
+        page_text = self.browser.find_element_by_tag_name('body').text
+        self.assertNotIn('Buy peacock feathers', page_text)
+        self.assertNotIn('Buy milk', page_text)
+
+        # Satisfied they both go back to sleep
 
         self.fail('Finish the test')
 
         # He visits that URL - his to-do list is still there.
 
-if __name__ == '__main__':
-    unittest.main(warnings='ignore')
+        # Satisfied, he goes back to sleep
